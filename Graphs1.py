@@ -63,7 +63,6 @@ def calculate_summary_stats(returns):
     }
     return summary
 
-
 # Function to calculate detailed statistics
 def calculate_detailed_stats(returns):
     returns = returns.dropna()
@@ -100,6 +99,31 @@ def plot_combined_cumulative_returns(strategies_data, title):
         ax.plot(
             cumulative_returns.index, cumulative_returns, label=strategy, linewidth=1
         )
+        
+    start_date = "2007-12-01"
+    end_date = "2009-03-31"
+    d1 = datetime.strptime(start_date, "%Y-%m-%d")
+    d2 = datetime.strptime(end_date, "%Y-%m-%d")
+    ax.axvspan(
+        start_date,
+        end_date,
+        color="red",
+        alpha=0.3,
+        label=start_date + "--" + end_date,
+    )
+
+    start_date = "2020-02-01"
+    end_date = "2020-03-31"
+    d1 = datetime.strptime(start_date, "%Y-%m-%d")
+    d2 = datetime.strptime(end_date, "%Y-%m-%d")
+    ax.axvspan(
+        start_date,
+        end_date,
+        color="red",
+        alpha=0.3,
+        label=start_date + "--" + end_date,
+    )
+    
     ax.set_title(title)
     ax.set_xlabel("Date")
     ax.set_ylabel("Cumulative Returns")
@@ -125,7 +149,7 @@ def plot_combined_drawdown(strategies_data, title):
         end_date,
         color="red",
         alpha=0.3,
-        label=f"Drawdown Period {abs((d2 - d1).days) + 1}",
+        label=start_date + "--" + end_date,
     )
 
     start_date = "2020-02-01"
@@ -137,15 +161,16 @@ def plot_combined_drawdown(strategies_data, title):
         end_date,
         color="red",
         alpha=0.3,
-        label=f"Drawdown Period {abs((d2 - d1).days) + 1}",
+        label=start_date + "--" + end_date,
     )
     ax.set_title(title)
     ax.set_xlabel("Date")
     ax.set_ylabel("Drawdown")
     ax.grid(True)
-    legend = ax.get_legend()
-    if legend:
-        legend.remove()  # Remove legend textbox if it exists
+    ax.legend(fontsize="large")
+    # legend = ax.get_legend()
+    # if legend:
+    #     legend.remove()  # Remove legend textbox if it exists
     plt.tight_layout()
     return plot_to_base64(fig)
 
@@ -281,6 +306,28 @@ def extract_detailed_table(html_file):
             detailed_table_html += str(table)
         return detailed_table_html
 
+def get_excess_return_stats(file_path):
+  xls = pd.ExcelFile(file_path)
+  field_names = ['return_1m', 'return_1m', 'return_1m', 'return_8m', 'return_6m']
+  sheet_names = xls.sheet_names
+  excess_df = pd.DataFrame()
+  for name, field in zip(sheet_names, field_names):
+    returns = pd.read_excel(file_path, sheet_name=name)
+    highvol_returns = returns[returns['episode'] == 'highvol']
+    lowvol_returns = returns[returns['episode'] == 'lowvol']
+    excess_stats = {
+      'All Count': int(returns['date'].count()),
+      'All Avg return': returns[field].mean(),
+      'All Standard Deviation': returns[field].std(),
+      'LowVol Count': lowvol_returns['date'].count(),
+      'LowVol Avg return': lowvol_returns[field].mean(),
+      'LowVol Standard Deviation': lowvol_returns[field].std(),
+      'HighVol Count': highvol_returns['date'].count(),
+      'HighVol Avg return': highvol_returns[field].mean(),
+      'HighVol Standard Deviation': highvol_returns[field].std(),
+    }
+    excess_df[name] = pd.Series(excess_stats)
+  return excess_df
 
 # Sample Data for Multiple Strategies using QuantStats
 tickers = ["AAPL", "MSFT", "GOOG"]
@@ -299,11 +346,20 @@ for strategy, returns in strategies_data.items():
 summary_df = summary_df.applymap(
     lambda x: format_percent(x) if isinstance(x, float) else x
 )
-
+# combined_df = combined_df.applymap(
+#     lambda x:format_percent(x) if isinstance(x, float) else x
+# )
 # Convert DataFrames to HTML
 html_summary_table = summary_df.to_html(classes="table table-striped", border=0)
 
+#Excess Return Stats DataFrames by Episode
+# combined_df = excess_return_df.to_html(classes="table table-striped, border=0")
+
 # Custom HTML template
+file_path = 'input.xlsx'
+excess_stats_table = get_excess_return_stats(file_path)
+html_excess_stats_table = excess_stats_table.to_html(classes="table table-striped", border=0)
+
 html_template = f"""
 <html>
 <head>
@@ -339,6 +395,8 @@ html_template = f"""
 <body>
     <h1>Summary Statistics</h1>
     {html_summary_table}
+    <h1>Excess Stats</h1>
+    {html_excess_stats_table}
     <h1>Charts</h1>
 """
 
