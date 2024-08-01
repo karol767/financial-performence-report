@@ -8,12 +8,15 @@ from io import BytesIO
 from bs4 import BeautifulSoup
 from datetime import datetime
 
+
 # Function to format numbers and percentages
 def format_percent(x):
     return "{:.2f}%".format(x * 100)
 
+
 def format_number(x):
     return "{:.2f}".format(x)
+
 
 # Function to calculate summary statistics manually
 def calculate_summary_stats(returns):
@@ -112,6 +115,30 @@ def plot_combined_drawdown(strategies_data, title):
     for strategy, returns in strategies_data.items():
         drawdown = qs.stats.to_drawdown_series(returns)
         ax.plot(drawdown.index, drawdown, label=strategy, linewidth=1)
+
+    start_date = "2007-12-01"
+    end_date = "2009-03-31"
+    d1 = datetime.strptime(start_date, "%Y-%m-%d")
+    d2 = datetime.strptime(end_date, "%Y-%m-%d")
+    ax.axvspan(
+        start_date,
+        end_date,
+        color="red",
+        alpha=0.3,
+        label=f"Drawdown Period {abs((d2 - d1).days) + 1}",
+    )
+
+    start_date = "2020-02-01"
+    end_date = "2020-03-31"
+    d1 = datetime.strptime(start_date, "%Y-%m-%d")
+    d2 = datetime.strptime(end_date, "%Y-%m-%d")
+    ax.axvspan(
+        start_date,
+        end_date,
+        color="red",
+        alpha=0.3,
+        label=f"Drawdown Period {abs((d2 - d1).days) + 1}",
+    )
     ax.set_title(title)
     ax.set_xlabel("Date")
     ax.set_ylabel("Drawdown")
@@ -172,13 +199,21 @@ def plot_worst_5_drawdown_periods(returns, title):
     #     # qs.stats.drawdown_details(returns).sort_values(by='max drawdown', ascending=True)[:5]
     # )
     datas = qs.stats.to_drawdown_series(returns)
-    drawdown_periods = qs.stats.drawdown_details(datas).sort_values(by='max drawdown').head(5)
+    drawdown_periods = (
+        qs.stats.drawdown_details(datas).sort_values(by="max drawdown").head(5)
+    )
     # drawdown_periods = (
     #     qs.stats.drawdown_details(returns).sort_values(by="max drawdown").head(5)
     # )
     # print(qs.stats.to_drawdown_series(returns).sort_values('max drawdown')[:5], '#')
     cumulative_returns = (returns + 1).cumprod() - 1
-    ax.plot(cumulative_returns.index, cumulative_returns, linewidth=1, color="blue", label="Cumulative Returns")
+    ax.plot(
+        cumulative_returns.index,
+        cumulative_returns,
+        linewidth=1,
+        color="blue",
+        label="Cumulative Returns",
+    )
 
     for idx, row in drawdown_periods.iterrows():
         start_date = row["start"]
@@ -188,7 +223,11 @@ def plot_worst_5_drawdown_periods(returns, title):
         # return abs((d2 - d1).days)
         # print(abs((d2 - d1).days))
         ax.axvspan(
-            start_date, end_date, color="red", alpha=0.3, label=f"Drawdown Period {abs((d2 - d1).days) + 1}"
+            start_date,
+            end_date,
+            color="red",
+            alpha=0.3,
+            label=f"Drawdown Period {abs((d2 - d1).days) + 1}",
         )
 
     ax.set_title(title)
@@ -199,10 +238,13 @@ def plot_worst_5_drawdown_periods(returns, title):
     # Consolidate unique legends
     handles, labels = ax.get_legend_handles_labels()
     unique_labels = dict(zip(labels, handles))  # Using dict to keep only unique labels
-    ax.legend(unique_labels.values(), unique_labels.keys(), loc='best')  # Update the legend
+    ax.legend(
+        unique_labels.values(), unique_labels.keys(), loc="best"
+    )  # Update the legend
 
     plt.tight_layout()
     return plot_to_base64(fig)
+
 
 # Function to plot underwater plot
 def plot_underwater(returns, title):
@@ -329,15 +371,19 @@ for strategy, returns in strategies_data.items():
 # Generate QuantStats HTML reports for each strategy and extract detailed tables
 detailed_table_html = ""
 for strategy, returns in strategies_data.items():
+    returns.to_csv("test.txt", header=True)
     temp_report_file = f"temp_quantstats_report_{strategy}.html"
     qs.reports.html(returns, output=temp_report_file, title=f"{strategy} Report")
-    detailed_table_html += f"<h1>{strategy} Detailed Statistics</h1>"
-    detailed_table_html += extract_detailed_table(temp_report_file)
+    detailed_table_html += f"<div style='width:33.3333%; float:left'><h1>{strategy} Detailed Statistics</h1>"
+    print(temp_report_file, '####')
+    detailed_table_html += extract_detailed_table(temp_report_file) + f"</div>"
 
 # Add the extracted detailed tables to the HTML report
 html_template += f"""
     <h1>Detailed Statistics</h1>
+    <div>
     {detailed_table_html}
+    </div>
 </body>
 </html>
 """
