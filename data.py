@@ -21,29 +21,30 @@ def format_number(x):
 
 # Function to calculate summary statistics manually
 def calculate_summary_stats(returns):
+    returns = returns.resample('M').mean()
     returns = returns.dropna()
     cagr = qs.stats.cagr(returns)
     volatility = qs.stats.volatility(returns)
     sharpe = qs.stats.sharpe(returns)
     max_drawdown = qs.stats.max_drawdown(returns)
-    mtd = (returns[-21:] + 1).prod() - 1
-    three_m = (returns[-63:] + 1).prod() - 1
-    six_m = (returns[-126:] + 1).prod() - 1
+    mtd = (returns[-1:] + 1).prod() - 1
+    three_m = (returns[-3:] + 1).prod() - 1
+    six_m = (returns[-6:] + 1).prod() - 1
     ytd = (returns[returns.index.year == returns.index[-1].year] + 1).prod() - 1
-    one_y = (returns[-252:] + 1).prod() - 1
+    one_y = (returns[-12:] + 1).prod() - 1
     three_y = (
-        (returns[-756:] + 1).prod() ** (252 / 756) - 1
-        if len(returns) >= 756
+        (returns[-36:] + 1).prod() ** (12 / 36) - 1
+        if len(returns) >= 36
         else np.nan
     )
     five_y = (
-        (returns[-1260:] + 1).prod() ** (252 / 1260) - 1
-        if len(returns) >= 1260
+        (returns[-72:] + 1).prod() ** (12 / 72) - 1
+        if len(returns) >= 72
         else np.nan
     )
     ten_y = (
-        (returns[-2520:] + 1).prod() ** (252 / 2520) - 1
-        if len(returns) >= 2520
+        (returns[-120:] + 1).prod() ** (12 / 120) - 1
+        if len(returns) >= 120
         else np.nan
     )
 
@@ -323,8 +324,6 @@ def extract_detailed_table(html_file):
 
 def table_calendar_year(returns, title):
   returns = returns.resample("Y").apply(lambda x: (x + 1).prod() - 1)
-  print(returns.index.year)
-  print(returns.values)
   
   years = returns.index.year
   returns = returns.values
@@ -342,8 +341,6 @@ def table_calendar_year(returns, title):
 
   # Create the table
   table = ax.table(cellText=data, colLabels=years, cellLoc='center', loc='center', )
-
-  # Set the font size for the table
   table.auto_set_font_size(False)
   table.set_fontsize(16)
 
@@ -358,6 +355,102 @@ def table_calendar_year(returns, title):
   # Adjust layout and show the table
   plt.tight_layout()
   return plot_to_base64(fig)
+
+def table_calendar_year_volatility(returns, title):
+  # duplication row resolve
+  monthly_data = returns.resample('M').mean()
+  print(monthly_data.index[0], '################')
+  data = {
+    'date': pd.date_range(start=monthly_data.index[0], periods=monthly_data.count(), freq='M'),
+    'monthly_mean': monthly_data.array
+  }
+  print(monthly_data)
+  print(data)
+  df = pd.DataFrame(data)
+
+  # Step 1: Set the date column as index
+  df.set_index('date', inplace=True)
+
+  # Step 2: Calculate Monthly Returns
+  df['returns'] = np.log(df['monthly_mean'] / df['monthly_mean'].shift(1))
+
+  # Drop NaN values from the returns calculation
+  df.dropna(inplace=True)
+
+  # Step 3: Group by Year and Calculate Annual Volatility
+  annual_volatility = df.groupby(df.index.year)['returns'].std() * np.sqrt(12)
+
+  # Display the results
+  annual_volatility = annual_volatility.rename("Annual Volatility")
+  print(annual_volatility)
+  years = annual_volatility.index.tolist()
+  returns = annual_volatility.values
+  returns = [None if pd.isna(r) else format_percent(r / 100)
+    for r in returns]
+
+  # Combine years and returns into a structured format for the table
+  data = np.array([returns])  # Create a 2D array where the returns are in a single row
+
+  # Create a Matplotlib figure
+  fig, ax = plt.subplots(figsize=(16, 1))  # Adjust the figure size as needed
+
+  # Hide axes
+  ax.axis('tight')
+  ax.axis('off')
+
+  # Create the table
+  table = ax.table(cellText=data, colLabels=years, cellLoc='center', loc='center', )
+  table.auto_set_font_size(False)
+  table.set_fontsize(16)
+
+  # Optionally, set the table's cell colors or styles
+  for (i, j), cell in table.get_celld().items():
+      if j == 0:  # Only the first column (row labels)
+          cell.set_facecolor('#ffffff')  # Light gray background for the row header
+          cell.set_height(0.5)
+      else:  # Data cells
+          cell.set_facecolor('#ffffff')  # White background for data cells
+          cell.set_height(0.5)
+  # Adjust layout and show the table
+  plt.tight_layout()
+  return plot_to_base64(fig)
+  # returns = returns.resample("Y").apply(lambda x: (x + 1).pct_change() - 1)
+
+  # print(returns)
+  # years = returns.index.year
+  # returns = returns.values
+  # data = {
+  #   'date': ['2024-01-01', '2024-01-02', '2024-01-03', '2024-01-04', '2024-01-05'],
+  #   'close': [100, 101, 102, 98, 97]  # Sample closing prices
+  # }
+  # returns = [format_percent(r) for r in returns]
+
+  # # Combine years and returns into a structured format for the table
+  # data = np.array([returns])  # Create a 2D array where the returns are in a single row
+
+  # # Create a Matplotlib figure
+  # fig, ax = plt.subplots(figsize=(16, 1))  # Adjust the figure size as needed
+
+  # # Hide axes
+  # ax.axis('tight')
+  # ax.axis('off')
+
+  # # Create the table
+  # table = ax.table(cellText=data, colLabels=years, cellLoc='center', loc='center', )
+  # table.auto_set_font_size(False)
+  # table.set_fontsize(16)
+
+  # # Optionally, set the table's cell colors or styles
+  # for (i, j), cell in table.get_celld().items():
+  #     if j == 0:  # Only the first column (row labels)
+  #         cell.set_facecolor('#ffffff')  # Light gray background for the row header
+  #         cell.set_height(0.5)
+  #     else:  # Data cells
+  #         cell.set_facecolor('#ffffff')  # White background for data cells
+  #         cell.set_height(0.5)
+  # # Adjust layout and show the table
+  # plt.tight_layout()
+  # return plot_to_base64(fig)
 
 def get_excess_return_stats(file_path):
     xls = pd.ExcelFile(file_path)
@@ -388,6 +481,19 @@ def get_excess_return_stats(file_path):
         excess_df[name] = pd.Series(excess_stats)
     return excess_df
 
+# Custom HTML template
+file_path = "input.xlsx"
+excess_stats_table = get_excess_return_stats(file_path)
+html_excess_stats_table = excess_stats_table.to_html(
+    classes="table table-striped", border=0
+)
+
+field_names = ["return_1m", "return_1m", "return_1m", "return_8m", "return_6m"]
+xls = pd.ExcelFile(file_path)
+sheet_names = xls.sheet_names
+# sheet_names = ['strat1', 'strat2', 'strat3']
+
+
 
 # Sample Data for Multiple Strategies using QuantStats
 tickers = ["AAPL", "MSFT", "GOOG"]
@@ -397,10 +503,11 @@ strategies_data = {ticker: qs.utils.download_returns(ticker) for ticker in ticke
 summary_df = pd.DataFrame()
 
 # Calculate statistics for each strategy and combine into DataFrames
-for strategy, returns in strategies_data.items():
-    returns.to_csv("init.txt", header=True)
-    summary_stats = calculate_summary_stats(returns)
-    summary_df[strategy] = pd.Series(summary_stats)
+for name, field in zip(sheet_names, field_names):
+    returns = pd.read_excel("input.xlsx", sheet_name=name)
+    data = pd.Series(returns[field].to_numpy(), index=returns["date"])
+    summary_stats = calculate_summary_stats(data)
+    summary_df[name] = pd.Series(summary_stats)
 
 # Format the DataFrames
 summary_df = summary_df.applymap(
@@ -415,17 +522,8 @@ html_summary_table = summary_df.to_html(classes="table table-striped", border=0)
 # Excess Return Stats DataFrames by Episode
 # combined_df = excess_return_df.to_html(classes="table table-striped, border=0")
 
-# Custom HTML template
-file_path = "input.xlsx"
-excess_stats_table = get_excess_return_stats(file_path)
-html_excess_stats_table = excess_stats_table.to_html(
-    classes="table table-striped", border=0
-)
 
-field_names = ["return_1m", "return_1m", "return_1m", "return_8m", "return_6m"]
-xls = pd.ExcelFile(file_path)
-sheet_names = xls.sheet_names
-# sheet_names = ['strat1', 'strat2', 'strat3']
+
 
 html_template = f"""
 <html>
@@ -512,7 +610,7 @@ for name, field in zip(sheet_names, field_names):
 for name, field in zip(sheet_names, field_names):
     returns = pd.read_excel("input.xlsx", sheet_name=name)
     data = pd.Series(returns[field].to_numpy(), index=returns["date"])
-    html_template += f'<div class="chart"><h2>{name} Calendar Year Returns</h2><img src="data:image/png;base64,{table_calendar_year_volatility(data, name + " Calendar Year Returns")}" alt="{name} Calendar Year Returns"></div>'
+    html_template += f'<div class="chart"><h2>{name} Calendar Year Volatility</h2><img src="data:image/png;base64,{table_calendar_year_volatility(data, name + " Calendar Year Volatility")}" alt="{name} Calendar Year Volatility"></div>'
 
 # # Create individual daily active returns plots
 # for name, field in zip(sheet_names, field_names):
